@@ -189,7 +189,7 @@ Game_tlp_connect_accepted (NetClient *client, void *cmddata,
     game = NetClient_GetData (client);
     game->self.id = Socket_GetID (packet);
     game->connected = SCE_TRUE;
-    SCEE_SendMsg ("we have been accepted! our ID: %d\n", game->self.id);
+    SCEE_SendMsg ("connection accepted! our ID: %d\n", game->self.id);
     (void)cmddata; (void)size;
 }
 static void
@@ -378,15 +378,17 @@ Game_tlp_query_chunk (NetClient *client, void *cmddata, const char *p,
         return;
     }
 
-    /* write down the file */
-    SCE_File_Init (&fp);
-    if (SCE_File_Open (&fp, NULL, SCE_VOctree_GetNodeFilename (node),
-                       SCE_FILE_CREATE | SCE_FILE_WRITE) < 0)
-        goto fail;
+    if (size > PACKET_SIZE) {
+        /* write down the file */
+        SCE_File_Init (&fp);
+        if (SCE_File_Open (&fp, NULL, SCE_VOctree_GetNodeFilename (node),
+                           SCE_FILE_CREATE | SCE_FILE_WRITE) < 0)
+            goto fail;
 
-    if (SCE_File_Write (&packet[PACKET_SIZE], size - PACKET_SIZE, 1, &fp) < 0)
-        goto fail;
-    SCE_File_Close (&fp);
+        if (SCE_File_Write (&packet[PACKET_SIZE], size-PACKET_SIZE, 1, &fp) < 0)
+            goto fail;
+        SCE_File_Close (&fp);
+    }
 
     tc->status = TERRAIN_AVAILABLE;
     SCE_List_Remove (&tc->it);
@@ -772,7 +774,7 @@ static void Game_DownloadTree (Game *game)
         SCE_Encode_Long (y, &buffer[4]);
         SCE_Encode_Long (z, &buffer[8]);
 
-        /* TODO: send sha1 if any */
+        /* TODO: sha1? see server.c:tlp_query_octree() */
         NetClient_SendTCP (&game->self.client, TLP_QUERY_OCTREE, buffer, 12);
     }
 }
@@ -780,8 +782,10 @@ static void Game_DownloadTree (Game *game)
 static void Game_DownloadChunk (Game *game)
 {
     long x, y, z;
-    unsigned char buffer[32] = {0};
+    /* yeah sha1 sums are less than 32 bytes length but hey. */
+    unsigned char buffer[16 + 32] = {0};
     TerrainChunk *tc = NULL;
+    SCE_TSha1 sha1;
 
     if (!SCE_List_HasElements (&game->dl_chunks) &&
         SCE_List_HasElements (&game->queued_chunks)) {
@@ -796,8 +800,17 @@ static void Game_DownloadChunk (Game *game)
         SCE_Encode_Long (y, &buffer[8]);
         SCE_Encode_Long (z, &buffer[12]);
 
-        /* TODO: send sha1 if any */
-        NetClient_SendTCP (&game->self.client, TLP_QUERY_CHUNK, buffer, 16);
+        if (SCE_Sha1_FileSum (sha1,SCE_VOctree_GetNodeFilename(tc->node)) < 0) {
+            /* NOTE: we might want to output this somewhere else,
+               in a second log file for bullshit like this for example */
+            SCEE_LogSrc (); SCEE_Out (); SCEE_Clear ();
+            NetClient_SendTCP (&game->self.client, TLP_QUERY_CHUNK, buffer, 16);
+        } else {
+            SCEE_SendMsg ("chunk file exists, sending sha1\n");
+            strncpy (&buffer[16], sha1, SCE_SHA1_SIZE);
+            NetClient_SendTCP (&game->self.client, TLP_QUERY_CHUNK, buffer,
+                               16 + SCE_SHA1_SIZE);
+        }
     }
 }
 
