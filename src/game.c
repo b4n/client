@@ -20,7 +20,6 @@
 #include <SDL.h>
 #include <SCE/interface/SCEInterface.h>
 #include <tunel/common/netprotocol.h>
-#include "vcache.h"
 #include "game.h"
 
 #define FPS 60
