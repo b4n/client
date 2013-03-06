@@ -1086,6 +1086,7 @@ static int update_grid (SCE_SVoxelWorld *vw, SCE_SVoxelTerrain *vt,
 int Game_Launch (Game *game)
 {
     int loop = 1;
+    long x, y, z;
     float angle_y = 0., angle_x = 0., back_x = 0., back_y = 0.;
     int mouse_pressed = 0, wait, temps = 0, tm, i, j;
     SCE_SInertVar rx, ry;
@@ -1184,8 +1185,18 @@ int Game_Launch (Game *game)
 
     buf = SCE_malloc (GW * GH * GD * 4);
 
-    for (i = 0; i < game->n_lod; i++)
+    /* set position so that GetTheoreticalOrigin() can work */
+    x = game->self.pos[0];
+    y = game->self.pos[1];
+    z = game->self.pos[2];
+
+    SCE_VTerrain_SetPosition (game->vt, x, y, z);
+
+    for (i = 0; i < game->n_lod; i++) {
         SCE_VTerrain_UpdateGrid (game->vt, i, SCE_FALSE);
+        SCE_VTerrain_GetRectangle (game->vt, i, &rect);
+        SCE_VWorld_AddUpdatedRegion (game->vw, i, &rect);
+    }
 
     /* sky lighting */
     l = SCE_Light_Create ();
@@ -1326,7 +1337,7 @@ int Game_Launch (Game *game)
         i = SDL_GetTicks ();
 
         {
-            long missing[3], k, x, y, z;
+            long missing[3], k;
             x = game->self.pos[0];
             y = game->self.pos[1];
             z = game->self.pos[2];
