@@ -815,6 +815,7 @@ static int Game_query_tree (Game *game, SCE_SVoxelWorldTree *wt)
         }
         tree->tree = wt;
         SCE_VOctree_SetData (SCE_VWorld_GetOctree (wt), tree);
+        SCE_VOctree_SetFreeFunc (SCE_VWorld_GetOctree (wt), TTree_Free);
     }
 
     if (tree->status == TERRAIN_UNAVAILABLE) {
@@ -840,6 +841,7 @@ static int Game_query_chunk (Game *game, SCE_SVoxelOctreeNode *node)
         }
         chunk->node = node;
         SCE_VOctree_SetNodeData (node, chunk);
+        SCE_VOctree_SetNodeFreeFunc (node, TChunk_Free);
     }
 
     if (chunk->status == TERRAIN_UNAVAILABLE) {
