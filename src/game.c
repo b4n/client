@@ -937,6 +937,42 @@ fail:
 }
 
 
+static int Game_LOD0ChunksPls (Game *game)
+{
+    SCE_SLongRect3 rect;
+    SCE_SList list;
+    SCE_SListIterator *it = NULL;
+
+    SCE_VTerrain_GetRectangle (game->vt, 0, &rect);
+
+    SCE_List_Init (&list);
+    if (SCE_VWorld_FetchNodes (game->vw, 0, &rect, &list) < 0)
+        goto fail;
+    /* cycle through to queue them */
+    SCE_List_ForEach (it, &list) {
+        if (Game_query_chunk (game, SCE_List_GetData (it)) < 0)
+            goto fail;
+    }
+    SCE_List_Flush (&list);
+
+    /* download ALL the chunks. */
+    while (SCE_List_HasElements (&game->queued_chunks) ||
+           SCE_List_HasElements (&game->dl_chunks)) {
+        Game_DownloadChunk (game);
+        if (NetClient_WaitTCP (&game->self.client, 1, 0) < 0)
+            goto fail;
+        if (NetClient_TCPStep (&game->self.client, NULL) < 0)
+            goto fail;
+    }
+
+    return SCE_OK;
+fail:
+    SCE_List_Flush (&list);
+    SCEE_LogSrc ();
+    return SCE_ERROR;
+}
+
+
 static int Game_UpdateTerrain (Game *game)
 {
     SCE_SLongRect3 rect;
@@ -1191,6 +1227,10 @@ int Game_Launch (Game *game)
     z = game->self.pos[2];
 
     SCE_VTerrain_SetPosition (game->vt, x, y, z);
+
+    /* query for visible LOD 0 chunks */
+    if (Game_LOD0ChunksPls (game) < 0)
+        goto fail;
 
     for (i = 0; i < game->n_lod; i++) {
         SCE_VTerrain_UpdateGrid (game->vt, i, SCE_FALSE);
