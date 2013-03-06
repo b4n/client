@@ -388,7 +388,6 @@ Game_tlp_query_chunk (NetClient *client, void *cmddata, const char *p,
     if (SCE_File_Write (&packet[PACKET_SIZE], size - PACKET_SIZE, 1, &fp) < 0)
         goto fail;
     SCE_File_Close (&fp);
-    SCEE_SendMsg ("chunk downloaded: %d - %ld %ld %ld\n", level, x, y, z);
 
     tc->status = TERRAIN_AVAILABLE;
     SCE_List_Remove (&tc->it);
@@ -495,7 +494,6 @@ static void Game_InitAllCommands (void)
         NetClient_InitCmd (&sc_tcpcmds[i]);               \
         NetClient_SetCmdID (&sc_tcpcmds[i], id);          \
         NetClient_SetCmdCallback (&sc_tcpcmds[i], fun);   \
-        SCEE_SendMsg ("%s = %d\n", #id, id);              \
         i++;                                           \
     } while (0)
     SC_SETTCPCMD (TLP_GET_CLIENT_NUM, Game_tlp_get_client_num);
@@ -1052,7 +1050,6 @@ static int update_grid (SCE_SVoxelWorld *vw, SCE_SVoxelTerrain *vt,
         tt = SCE_VOctree_GetData (SCE_VWorld_GetOctree (wt));
         if (!tt || tt->status != TERRAIN_AVAILABLE) {
             SCE_List_Flush (&list);
-            SCEE_SendMsg ("no tree\n");
             return SCE_FALSE;
         }
     }
@@ -1067,7 +1064,6 @@ static int update_grid (SCE_SVoxelWorld *vw, SCE_SVoxelTerrain *vt,
         tc = SCE_VOctree_GetNodeData (node);
         if (!tc || tc->status != TERRAIN_AVAILABLE) {
             SCE_List_Flush (&list);
-            SCEE_SendMsg ("no chunk\n");
             return SCE_FALSE;
         }
     }
@@ -1075,8 +1071,6 @@ static int update_grid (SCE_SVoxelWorld *vw, SCE_SVoxelTerrain *vt,
 
     SCE_VWorld_GetRegion (vw, level, &r, buf);
     SCE_VTerrain_AppendSlice (vt, level, f, buf);
-    if (level != 0)
-        SCEE_SendMsg ("append slice for level %d (not 0!!)\n", level);
 
     return SCE_TRUE;
 }
