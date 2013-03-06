@@ -998,6 +998,43 @@ fail:
     return SCE_ERROR;
 }
 
+static int is_region_available (SCE_SVoxelWorld *vw, SCEuint level,
+                                const SCE_SLongRect3 *r)
+{
+    SCE_SList list;
+    SCE_SListIterator *it = NULL;
+
+    /* check if all needed octrees are available */
+    SCE_List_Init (&list);
+    SCE_VWorld_FetchTrees (vw, level, r, &list);
+    SCE_List_ForEach (it, &list) {
+        TerrainTree *tt = NULL;
+        SCE_SVoxelWorldTree *wt = SCE_List_GetData (it);
+        tt = SCE_VOctree_GetData (SCE_VWorld_GetOctree (wt));
+        if (!tt || tt->status != TERRAIN_AVAILABLE) {
+            SCE_List_Flush (&list);
+            return SCE_FALSE;
+        }
+    }
+    SCE_List_Flush (&list);
+
+    /* check if all needed nodes are available */
+    SCE_List_Init (&list);
+    SCE_VWorld_FetchNodes (vw, level, r, &list);
+    SCE_List_ForEach (it, &list) {
+        TerrainChunk *tc = NULL;
+        SCE_SVoxelOctreeNode *node = SCE_List_GetData (it);
+        tc = SCE_VOctree_GetNodeData (node);
+        if (!tc || tc->status != TERRAIN_AVAILABLE) {
+            SCE_List_Flush (&list);
+            return SCE_FALSE;
+        }
+    }
+    SCE_List_Flush (&list);
+
+    return SCE_TRUE;
+}
+
 static int update_grid (SCE_SVoxelWorld *vw, SCE_SVoxelTerrain *vt,
                         SCEuint level, SCE_EBoxFace f)
 {
@@ -1009,17 +1046,12 @@ static int update_grid (SCE_SVoxelWorld *vw, SCE_SVoxelTerrain *vt,
     unsigned char buf[GW * GW] = {0};
 
     SCE_SLongRect3 r;
-    SCE_SList list;
-    SCE_SListIterator *it = NULL;
 
     w = SCE_VTerrain_GetWidth (vt);
     h = SCE_VTerrain_GetHeight (vt);
     d = SCE_VTerrain_GetDepth (vt);
 
-    SCE_VTerrain_GetOrigin (vt, level, &origin_x, &origin_y, &origin_z);
-    x = origin_x;
-    y = origin_y;
-    z = origin_z;
+    SCE_VTerrain_GetOrigin (vt, level, &x, &y, &z);
 
     switch (f) {
     case SCE_BOX_POSX:
@@ -1043,33 +1075,8 @@ static int update_grid (SCE_SVoxelWorld *vw, SCE_SVoxelTerrain *vt,
         SCE_Rectangle3_SetFromOriginl (&r, x, y, z, w, h, 1);
     }
 
-    /* check if all needed octrees are available */
-    SCE_List_Init (&list);
-    SCE_VWorld_FetchTrees (vw, level, &r, &list);
-    SCE_List_ForEach (it, &list) {
-        TerrainTree *tt = NULL;
-        SCE_SVoxelWorldTree *wt = SCE_List_GetData (it);
-        tt = SCE_VOctree_GetData (SCE_VWorld_GetOctree (wt));
-        if (!tt || tt->status != TERRAIN_AVAILABLE) {
-            SCE_List_Flush (&list);
-            return SCE_FALSE;
-        }
-    }
-    SCE_List_Flush (&list);
-
-    /* check if all needed nodes are available */
-    SCE_List_Init (&list);
-    SCE_VWorld_FetchNodes (vw, level, &r, &list);
-    SCE_List_ForEach (it, &list) {
-        TerrainChunk *tc = NULL;
-        SCE_SVoxelOctreeNode *node = SCE_List_GetData (it);
-        tc = SCE_VOctree_GetNodeData (node);
-        if (!tc || tc->status != TERRAIN_AVAILABLE) {
-            SCE_List_Flush (&list);
-            return SCE_FALSE;
-        }
-    }
-    SCE_List_Flush (&list);
+    if (!is_region_available (vw, level, &r))
+        return SCE_FALSE;
 
     SCE_VWorld_GetRegion (vw, level, &r, buf);
     SCE_VTerrain_AppendSlice (vt, level, f, buf);
