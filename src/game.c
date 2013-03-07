@@ -837,12 +837,14 @@ static void Game_DownloadChunk (Game *game)
         SCE_Encode_Long (z, &buffer[12]);
 
         if (SCE_Sha1_FileSum (sha1,SCE_VOctree_GetNodeFilename(tc->node)) < 0) {
-            /* NOTE: we might want to output this somewhere else,
-               in a second log file for bullshit like this for example */
-            SCEE_LogSrc (); SCEE_Out (); SCEE_Clear ();
+            if (SCEE_GetCode () != SCE_FILE_NOT_FOUND) {
+                SCEE_LogSrc ();
+                SCEE_Out ();
+                return;         /* :} */
+            }
+            SCEE_Clear ();
             NetClient_SendTCP (&game->self.client, TLP_QUERY_CHUNK, buffer, 16);
         } else {
-            SCEE_SendMsg ("chunk file exists, sending sha1\n");
             strncpy (&buffer[16], sha1, SCE_SHA1_SIZE);
             NetClient_SendTCP (&game->self.client, TLP_QUERY_CHUNK, buffer,
                                16 + SCE_SHA1_SIZE);
