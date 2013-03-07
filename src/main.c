@@ -78,11 +78,14 @@ int main (int argc, char **argv)
     Game_InitSubsystem (game);
     Game_InitConfig (&config);
 
-    if (argv[1])
-        strcpy (game->self.nick, argv[1]);
-    else
-        strcpy (game->self.nick, "Fooo");
     sprintf (game->server_ip, "127.0.0.1:%d", PORT);
+    if (!argv[1])
+        strcpy (game->self.nick, "Lefuneste");
+    else {
+        strcpy (game->self.nick, argv[1]);
+        if (argv[2])
+            sprintf (game->server_ip, "%s:%d", argv[2], PORT);
+    }
 
     SDL_Delay (100);
     if (Game_Launch (game) < 0)
