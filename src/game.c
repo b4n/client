@@ -20,6 +20,7 @@
 #include <SDL.h>
 #include <SCE/interface/SCEInterface.h>
 #include <tunel/common/netprotocol.h>
+#include <tunel/common/terrainbrush.h>
 #include "game.h"
 
 #define FPS 60
@@ -415,7 +416,6 @@ Game_tlp_no_octree (NetClient *client, void *cmddata, const char *p,
 
     game = NetClient_GetData (client);
 
-    /* check if we were expecting such information */
     x = SCE_Decode_Long (packet);
     y = SCE_Decode_Long (&packet[4]);
     z = SCE_Decode_Long (&packet[8]);
@@ -452,7 +452,6 @@ Game_tlp_no_chunk (NetClient *client, void *cmddata, const char *p,
 
     game = NetClient_GetData (client);
 
-    /* check if we were expecting such information */
     level = SCE_Decode_Long (packet);
     x = SCE_Decode_Long (&packet[4]);
     y = SCE_Decode_Long (&packet[8]);
@@ -471,6 +470,41 @@ Game_tlp_no_chunk (NetClient *client, void *cmddata, const char *p,
         tc->status = TERRAIN_AVAILABLE;
         SCE_List_Remove (&tc->it);
     }
+}
+
+static void
+Game_tlp_edit_terrain (NetClient *client, void *cmddata, const char *p,
+                       size_t size)
+{
+    (void)cmddata;
+    Game *game = NULL;
+    long x, y, z, w, h, d;
+    SCE_SVoxelOctreeNode *node = NULL;
+    TerrainChunk *tc = NULL;
+    SCE_SLongRect3 rect;
+    int expected = SCE_FALSE;
+    const unsigned char *packet = p;
+
+    game = NetClient_GetData (client);
+
+    x = SCE_Decode_Long (packet);
+    y = SCE_Decode_Long (&packet[4]);
+    z = SCE_Decode_Long (&packet[8]);
+    w = SCE_Decode_Long (&packet[12]);
+    h = SCE_Decode_Long (&packet[16]);
+    d = SCE_Decode_Long (&packet[20]);
+
+    SCE_Rectangle3_SetFromOriginl (&rect, x, y, z, w, h, d);
+
+    if (size - 24 != SCE_Rectangle3_GetAreal (&rect)) {
+        SCEE_SendMsg ("TLP_EDIT_TERRAIN: packet corrupted: invalid size\n");
+        return;
+    }
+
+    if (SCE_VWorld_SetRegion (game->vw, &rect, &packet[24]) < 0)
+        SCEE_LogSrc ();
+    if (SCE_VWorld_GenerateAllLOD (game->vw, 0, &rect) < 0)
+        SCEE_LogSrc ();
 }
 
 
@@ -509,6 +543,7 @@ static void Game_InitAllCommands (void)
     SC_SETTCPCMD (TLP_QUERY_CHUNK, Game_tlp_query_chunk);
     SC_SETTCPCMD (TLP_NO_OCTREE, Game_tlp_no_octree);
     SC_SETTCPCMD (TLP_NO_CHUNK, Game_tlp_no_chunk);
+    SC_SETTCPCMD (TLP_EDIT_TERRAIN, Game_tlp_edit_terrain);
 #undef SC_SETTCPCMD
     sc_numtcp = i;
 }
@@ -668,18 +703,16 @@ static int Game_InitTerrain (Game *game)
     fcache = &game->fcache;
     fsys = &game->fsys;
 
-    strcpy (path, "data/"SERVER_TERRAINS"/");
-    /* TODO: with some magic (like IP address of the server or some
-       generated ID), retrieve server's specific path for terrain data */
-    strcat (path, "potager");
-
     /* create voxel world */
     game->vw = vw = SCE_VWorld_Create ();
     if (!vw) goto fail;
 
-    strcat (path, "/");
+    strcpy (path, "data/"SERVER_TERRAINS"/");
+    /* TODO: with some magic (like IP address of the server or some
+       generated ID), retrieve server's specific path for terrain data */
+    strcat (path, "potager/");
     strcat (path, VWORLD_PREFIX);
-    strcat (path, "/");
+
     SCE_VWorld_SetPrefix (vw, path);
     *fsys = sce_cachefs;
     fsys->udata = fcache;
@@ -689,6 +722,7 @@ static int Game_InitTerrain (Game *game)
     SCE_VWorld_SetMaxCachedNodes (vw, 256);
 
     strcpy (game->world_path, path);
+    strcat (path, "/");
     strcat (path, VWORLD_FNAME);
     /* strcpy (game->world_file, path); */
 
@@ -1152,6 +1186,7 @@ int Game_Launch (Game *game)
     SCEubyte *buf = NULL;
     int shadows = SCE_FALSE;
     int first_draw = SCE_FALSE;
+    int apply_mode = SCE_FALSE;
 
     /* initialize connection */
     if (Game_InitConnection (game) < 0)
@@ -1358,6 +1393,9 @@ int Game_Launch (Game *game)
                     shadows = !shadows;
                     SCE_Light_SetShadows (l, shadows);
                     break;
+                case SDLK_SPACE:
+                    apply_mode = !apply_mode;
+                    break;
                 case SDLK_v:
                 {
                     unsigned int v = SCE_VRender_GetMaxV ();
@@ -1383,6 +1421,23 @@ int Game_Launch (Game *game)
         SCE_Matrix4_MulRotZ (matrix, -(SCE_Inert_Get (&ry) * 0.2) * RAD);
         SCE_Matrix4_MulTranslate (matrix, 0.0, 0.0, -30.);
 
+        /* integer version of our position */
+        x = game->self.pos[0];
+        y = game->self.pos[1];
+        z = game->self.pos[2];
+
+        if (apply_mode) {
+            unsigned char packet[24] = {0};
+            SCE_Encode_Long (x, packet);
+            SCE_Encode_Long (y, &packet[4]);
+            SCE_Encode_Long (z, &packet[8]);
+            SCE_Encode_Long (0, &packet[12]);
+            SCE_Encode_Long (4, &packet[16]);
+            SCE_Encode_Long (TBRUSH_ADD, &packet[20]);
+            NetClient_SendTCP (&game->self.client, TLP_EDIT_TERRAIN,
+                               packet, 24);
+        }
+
         /* update terrain (check whether we need some parts of the terrain,
            stuff like that) */
         Game_UpdateTerrain (game);
@@ -1391,9 +1446,6 @@ int Game_Launch (Game *game)
 
         {
             long missing[3], k;
-            x = game->self.pos[0];
-            y = game->self.pos[1];
-            z = game->self.pos[2];
 
             SCE_VTerrain_SetPosition (game->vt, x, y, z);
 
