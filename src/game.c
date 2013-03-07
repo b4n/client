@@ -1340,6 +1340,12 @@ int Game_Launch (Game *game)
                 NetClient_TCPStep (&game->self.client, NULL);
         } while (res > 0);
 
+#ifdef DEBUG
+        if ((time (NULL) - NetClient_LastPacket (&game->self.client)) > 30) {
+            SCEE_SendMsg ("it has been more than 30s since the last packet\n");
+        }
+#endif
+
         while (SDL_PollEvent (&ev)) {
             switch (ev.type) {
             case SDL_QUIT: loop = 0; break;
