@@ -1323,13 +1323,20 @@ int Game_Launch (Game *game)
     temps = 0;
 
     while (loop) {
-        int level;
+        int level, res;
 
         tm = SDL_GetTicks ();
 
         /* flush pending packets */
-        while (NetClient_PollTCP (&game->self.client))
-            NetClient_TCPStep (&game->self.client, NULL);
+        do {
+            res = NetClient_PollTCP (&game->self.client);
+            if (res < 0) {
+                SCEE_LogSrc ();
+                goto fail;
+            }
+            if (res)
+                NetClient_TCPStep (&game->self.client, NULL);
+        } while (res > 0);
 
         while (SDL_PollEvent (&ev)) {
             switch (ev.type) {
