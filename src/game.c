@@ -787,6 +787,8 @@ fail:
 }
 
 
+#define GAME_MAX_DOWNLOADING_PACKETS 5
+
 /* download a single (single really?) queued tree (if any) */
 static void Game_DownloadTree (Game *game)
 {
@@ -796,7 +798,7 @@ static void Game_DownloadTree (Game *game)
 
     /* TODO: this scheme needs to be improved, let there be a given number of
        elements in dl_trees instead of 0 or 1 */
-    if (!SCE_List_HasElements (&game->dl_trees) &&
+    if (SCE_List_GetLength (&game->dl_trees) < GAME_MAX_DOWNLOADING_PACKETS &&
         SCE_List_HasElements (&game->queued_trees)) {
 
         tt = SCE_List_GetData (SCE_List_GetFirst (&game->queued_trees));
@@ -821,7 +823,7 @@ static void Game_DownloadChunk (Game *game)
     TerrainChunk *tc = NULL;
     SCE_TSha1 sha1;
 
-    if (!SCE_List_HasElements (&game->dl_chunks) &&
+    if (SCE_List_GetLength (&game->dl_chunks) < GAME_MAX_DOWNLOADING_PACKETS &&
         SCE_List_HasElements (&game->queued_chunks)) {
 
         tc = SCE_List_GetData (SCE_List_GetFirst (&game->queued_chunks));
