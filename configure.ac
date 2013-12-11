@@ -42,13 +42,6 @@ AM_PROG_CC_C_O
 TL_CLIENT_LTVERSION="0:0:0"
 AC_SUBST([TL_CLIENT_LTVERSION])
 
-pkgconfigdir="$libdir/pkgconfig"
-tl_includedir="$includedir/tunel"
-tl_include_dir="$tl_includedir/client"
-AC_SUBST(pkgconfigdir)
-AC_SUBST(tl_includedir)
-AC_SUBST(tl_include_clientdir)
-
 # Checks for libraries.
 
 # AX_REQUIRE_HEADER(HEADER, IF-PRESENT)

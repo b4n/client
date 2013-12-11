@@ -7,4 +7,5 @@ AM_CFLAGS  = @TL_CLIENT_CFLAGS@
 libtlclient_la_LIBADD  = $(AM_LIBS) @TL_CLIENT_LIBS@
 libtlclient_la_SOURCES = game.c
 
-tl_include_client_HEADERS = game.h
+tlclient_includedir = $(includedir)/tunel/client
+tlclient_include_HEADERS = game.h
