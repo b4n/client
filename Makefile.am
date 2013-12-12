@@ -1,13 +1,11 @@
-SUBDIRS = src
 
 bin_PROGRAMS = tlclient
 
-tlclient_SOURCES  = src/main.c
-tlclient_LDADD    = src/libtlclient.la @TL_CLIENT_LIBS@
+tlclient_SOURCES  = src/main.c \
+                    src/game.c \
+                    src/game.h
+tlclient_LDADD    = $(AM_LIBS) @TL_CLIENT_LIBS@
 tlclient_CPPFLAGS = @TL_DEBUG_CPPFLAGS@
-tlclient_CFLAGS   = @TL_CLIENT_CFLAGS@
-
-pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = tlclient.pc
+tlclient_CFLAGS   = $(AM_CFLAGS) @TL_CLIENT_CFLAGS@
 
 ACLOCAL_AMFLAGS = -I build/m4
