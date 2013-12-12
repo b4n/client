@@ -102,7 +102,7 @@ AC_SUBST([TL_DEBUG_CPPFLAGS])
 
 # output
 AC_CONFIG_FILES([Makefile
-                ])
+                 src/Makefile])
 AC_OUTPUT
 
 
